@@ -83,7 +83,7 @@ class NodeInfo:
     def check_height_stuck(self): 
 
         if self.last_height == self.current_height :
-            alarm_content = node_name + ": height stucked!"
+            alarm_content = f'{self.chain}({node_name}) : height stucked!'
             send_alarm(True, True, alarm_content)
 
 
