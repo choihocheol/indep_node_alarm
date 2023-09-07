@@ -3,6 +3,7 @@ import time
 import requests # sudo pip3 install requests
 import pypd # sudo pip3 install pypd
 import shutil
+from datetime import datetime
 
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
@@ -90,6 +91,10 @@ class NodeInfo:
         self.last_height = self.current_height
 
     def check_height_stuck(self): 
+        current_datetime = datetime.now()
+        log_entry = f"{current_datetime} Last: {self.last_height},  Current: {self.current_height}"
+        with open('/tmp/indep.log', 'a') as log_file:
+            log_file.write(log_entry + '\n')
 
         if self.last_height == self.current_height :
             alarm_content = node_name + ": height stucked!"
@@ -119,6 +124,11 @@ class NodeInfo:
             if precommit_match == False:
                 missing_block_cnt += 1
 
+        current_datetime = datetime.now()
+        log_entry = f"{current_datetime} Missed: {missing_block_cnt},  Threshold: {missing_block_trigger}"
+        with open('/tmp/indep.log', 'a') as log_file:
+            log_file.write(log_entry + '\n')
+            
         if missing_block_cnt >= missing_block_trigger:
             
             alarm_content = f'{node_name} : {self.chain} - missing block count({missing_block_cnt}) >=  threshold({missing_block_trigger})'
