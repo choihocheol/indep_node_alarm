@@ -92,7 +92,7 @@ class NodeInfo:
 
     def check_height_stuck(self): 
         current_datetime = datetime.now()
-        log_entry = f"{current_datetime} Last: {self.last_height},  Current: {self.current_height}"
+        log_entry = f"{current_datetime} Last: {self.last_height},  Current: {self.current_height}, Diff: {self.current_height-self.last_height}, BlockTime: {height_increasing_time_period/(self.current_height-self.last_height)}"
         with open('/tmp/indep.log', 'a') as log_file:
             log_file.write(log_entry + '\n')
 
