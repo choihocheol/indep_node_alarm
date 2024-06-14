@@ -21,7 +21,7 @@ missing_block_trigger = 10
 
 retries = Retry(total=10, connect=8, read=2, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504, 429])
 app = Flask(__name__)
-q_err = ["test1", "test2"]
+q_err = []
 
 def main() :
 
@@ -169,7 +169,5 @@ def newResponse(target, status, err):
 if __name__ == "__main__":
     thread = threading.Thread(target=main)
     thread.start()
-    print("Started main!!!!!!!!!!!!!")
 
-    print("Started app.main()!!!!!!!!!")
     app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
