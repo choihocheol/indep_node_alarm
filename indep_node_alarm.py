@@ -1,28 +1,27 @@
 import json
 import time
 import requests # sudo pip3 install requests
-import pypd # sudo pip3 install pypd
 import shutil
+import threading
 from datetime import datetime
 
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 from requests import Session
+from flask import Flask, jsonify
 
-retries = Retry(total=10, connect=8, read=2, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504, 429])
-
-telegram_token = ""
-telegram_chat_id = ""
-pypd.api_key = ""
-pypd.service_key = ""
-pypd.href = ""
-
+### Config
+### =====
 my_validator_address = ""
 node_name = "<nodename>"
 
 height_increasing_time_period = 600
 missing_block_trigger = 10
-free_disk_trigger = 10 # GB
+### =====
+
+retries = Retry(total=10, connect=8, read=2, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504, 429])
+app = Flask(__name__)
+q_err = ["test1", "test2"]
 
 def main() :
 
@@ -32,9 +31,7 @@ def main() :
     
     while True:
 
-        # Disk Free Check
-        check_freedisk("/")
-        check_freedisk("/data")
+        check_freedisk()
 
         # Last Height Check
         for node in node_list:
@@ -70,7 +67,7 @@ class NodeInfo:
                 self.last_height = last_height
             except Exception as e:
                 alarm_content = f'{node_name} : {self.chain} - get_last_height - Exception: {e}'
-                send_alarm(False, True, alarm_content)
+                pushErr(alarm_content)
 
     def get_current_height(self):
         with Session() as sess:
@@ -84,7 +81,7 @@ class NodeInfo:
             
             except Exception as e:
                 alarm_content = f'{node_name} : {self.chain} - get_current_height - Exception: {e}'
-                send_alarm(False, True, alarm_content)
+                pushErr(alarm_content)
                 return False
       
     def update_last_height(self):
@@ -98,7 +95,7 @@ class NodeInfo:
 
         if self.last_height == self.current_height :
             alarm_content = f'{self.chain}({node_name}) : height stucked!'
-            send_alarm(True, True, alarm_content)
+            pushErr(alarm_content)
 
 
     def check_block_missing(self):
@@ -132,42 +129,47 @@ class NodeInfo:
         if missing_block_cnt >= missing_block_trigger:
             
             alarm_content = f'{node_name} : {self.chain} - missing block count({missing_block_cnt}) >=  threshold({missing_block_trigger})'
-            send_alarm(True, True, alarm_content)
+            pushErr(alarm_content)
 
 ## Functions
-def check_freedisk(disk_location):
-    total, used, free = shutil.disk_usage(disk_location)
-    
-    if (free//(2**30)) < free_disk_trigger:
-        alarm_content = f'{node_name} : disk free is less than {free_disk_trigger} GB'
-        send_alarm(True, True, alarm_content)
+def check_freedisk():
+    try:
+        total, used, free = shutil.disk_usage("/")
+        free_disk_trigger = 10
+        if (free//(2**30)) < free_disk_trigger:
+            alarm_content = f'{node_name} (/ disk) : disk free is less than {free_disk_trigger} GB'
+            pushErr(alarm_content)
+    except Exception as e:
+        print(e)
 
+    try:
+        total, used, free = shutil.disk_usage("/data")
+        free_disk_trigger = 50
+        if (free//(2**30)) < free_disk_trigger:
+            alarm_content = f'{node_name} (/data disk) : disk free is less than {free_disk_trigger} GB'
+            pushErr(alarm_content)
+    except Exception as e:
+        print(e)
 
-def send_alarm(b_pagerduty, b_telegram, alarm_content) :
+def pushErr(err):
+    print("New issue occured in the node:", err)
+    q_err.append(err)
 
-    if b_pagerduty:
+@app.route('/', methods=['GET'])
+def handler():
+    # if len(q_err) == 0 means all fine.
+    errs = " %0A".join(q_err)
+    resp = newResponse(node_name, len(q_err), errs)
+    q_err.clear()
+    return resp
 
-        pypd.Event.create(data={
-            'service_key': pypd.service_key,
-            'event_type': 'trigger',
-            'description': alarm_content,
-            'contexts': [
-                  {
-                      'type': 'link',
-                      'href': pypd.href,
-                      'text': 'View in Control Server',
-                  },
-            ],
-        })
-
-    if b_telegram:
-        try:
-            requestURL = "https://api.telegram.org/bot" + str(telegram_token) + "/sendMessage?chat_id=" + telegram_chat_id + "&text="
-            requestURL = requestURL + str(alarm_content)
-            requests.get(requestURL, timeout=5)
-        except Exception as e:
-            print(f'Exception: {e}')    
-
+def newResponse(target, status, err):
+    return jsonify({"target": target,"status": status, "error": err})
 
 if __name__ == "__main__":
-    main()
+    thread = threading.Thread(target=main)
+    thread.start()
+    print("Started main!!!!!!!!!!!!!")
+
+    print("Started app.main()!!!!!!!!!")
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
